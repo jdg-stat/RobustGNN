@@ -3,6 +3,9 @@ import numpy as np
 from clusim.clustering import Clustering, print_clustering
 import clusim.sim as sim
 
+import torch
+from torch_geometric.utils import degree
+
 
 def line_gaussians(n_points,  # pylint: disable=missing-function-docstring
                    n_clusters = 2,
@@ -52,3 +55,41 @@ def compute_ecs(mask, ground_truth, pred):
     # print(clustering_pred)
     ecs = sim.element_sim(clustering_true, clustering_pred)
     return ecs
+
+
+def del_edges_randomly(pyg_data, p = 0.1):
+    
+    '''
+    takes a pyg data, select p% random nodes and deletes associated edges
+    then we modify the edge set and return the data in pyg format
+
+    '''
+
+    data = pyg_data.clone()
+    edge_set= data.edge_index.numpy(force=True)
+    node_set_del= np.random.randint(len(data.x), size = int(p*len(data.x)))
+    for i in node_set_del:
+        idx = np.where((edge_set[0] == i) | (edge_set[1]== i))
+        edge_set = np.delete(edge_set, idx, 1)
+    print(edge_set.shape)
+    data.edge_index= torch.tensor(edge_set)
+    return data
+
+def del_edges_targetted(pyg_data, p =0.1):
+
+    '''
+    takes a pyg data, select p% targetted by degree nodes and deletes associated edges
+    then we modify the edge set and return the data in pyg format
+
+    '''
+    data = pyg_data.clone()
+    del_size= int(p*len(data.x))
+    edge_set= data.edge_index.numpy(force=True)
+    deg_set= degree(data.edge_index[0]).numpy(force=True)
+    node_set_del= np.argpartition(deg_set,-del_size )[-del_size:]
+    # print(node_set_del)
+    for i in node_set_del:
+        idx = np.where((edge_set[0] == i) | (edge_set[1]== i))
+        edge_set = np.delete(edge_set, idx, 1)
+    data.edge_index= torch.tensor(edge_set)
+    return data
