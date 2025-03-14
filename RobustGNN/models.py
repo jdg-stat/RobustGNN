@@ -14,65 +14,81 @@ from torch.nn import Linear
 
 
 
+
 class GCN(torch.nn.Module):
-    def __init__(self, data):
-        super().__init__()
-        self.x = data.x 
-        self.num_feats = data.x.shape[1]
-        self.num_labels= len(set(data.y))
-        self.conv1 = GCNConv(self.num_feats, 16)
-        self.conv2 = GCNConv(16, self.num_labels)
+    def __init__(self, in_channels, hidden_channels, out_channels, num_layers=3, dropout=0.5):
+        super(GCN, self).__init__()
+        self.num_layers = num_layers
+        self.convs = torch.nn.ModuleList()
+        self.dropout = dropout
 
-    def forward(self, data):
-        x, edge_index = data.x, data.edge_index
+        self.convs.append(GCNConv(in_channels, hidden_channels))
+        
+        for _ in range(num_layers - 2):
+            self.convs.append(GCNConv(hidden_channels, hidden_channels))
+            
+        self.convs.append(GCNConv(hidden_channels, out_channels))
 
-        x = self.conv1(x, edge_index)
-        x = F.relu(x)
-        x = F.dropout(x, training=self.training)
-        x = self.conv2(x, edge_index)
-
+    def forward(self, x, edge_index):
+        for i in range(self.num_layers - 1):
+            x = self.convs[i](x, edge_index)
+            x = F.relu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.convs[-1](x, edge_index)
         return F.log_softmax(x, dim=1)
-
 
 class GAT(torch.nn.Module):
-    def __init__(self,data):
+    def __init__(self, in_channels, hidden_channels, out_channels, num_layers=3, 
+                 heads=8, dropout=0.5):
         super(GAT, self).__init__()
+        self.num_layers = num_layers
+        self.convs = torch.nn.ModuleList()
+        self.dropout = dropout
+
+        self.convs.append(GATConv(in_channels, hidden_channels, heads=heads))
         
-        self.num_classes = len(set(data.y))
-        self.num_feats = data.x.shape[1]
-        self.hid = 8
-        self.in_head = 8
-        self.out_head = 1
-        self.conv1 = GATConv(self.num_feats, self.hid, heads=self.in_head, dropout=0.6)
-        self.conv2 = GATConv(self.hid*self.in_head, self.num_classes, concat=False,
-                             heads=self.out_head, dropout=0.6)
+        for _ in range(num_layers - 2):
+            self.convs.append(
+                GATConv(hidden_channels * heads, hidden_channels, heads=heads))
+            
+        self.convs.append(
+            GATConv(hidden_channels * heads, out_channels, heads=1, concat=False))
 
-    def forward(self, data):
-        x, edge_index = data.x, data.edge_index
-                
-        x = F.dropout(x, p=0.6, training=self.training)
-        x = self.conv1(x, edge_index)
-        x = F.relu(x)
-        x = F.dropout(x, p=0.6, training=self.training)
-        x = self.conv2(x, edge_index)
-        
-        return F.log_softmax(x, dim=1) 
-
-class SAGE(torch.nn.Module):
-    def __init__(self, data):
-        super(SAGE, self).__init__()
-        self.num_classes = len(set(data.y))
-        self.num_feats = data.x.shape[1]
-        self.conv1 = SAGEConv(self.num_feats, 16)
-        self.conv2 = SAGEConv(16, self.num_classes)
-
-    def forward(self, data):
-        x,edge_index = data.x,data.edge_index
-        x = self.conv1(x, edge_index)
-        x = F.relu(x)
-        x = F.dropout(x, p=0.5, training=self.training)
-        x = self.conv2(x, edge_index)
+    def forward(self, x, edge_index):
+        for i in range(self.num_layers - 1):
+            x = self.convs[i](x, edge_index)
+            x = F.relu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.convs[-1](x, edge_index)
         return F.log_softmax(x, dim=1)
+
+class GraphSAGE(torch.nn.Module):
+    def __init__(self, in_channels, hidden_channels, out_channels, num_layers=3, 
+                 dropout=0.5, aggregator='mean'):
+        super(GraphSAGE, self).__init__()
+        self.num_layers = num_layers
+        self.convs = torch.nn.ModuleList()
+        self.dropout = dropout
+
+        # Input layer
+        self.convs.append(SAGEConv(in_channels, hidden_channels, aggr=aggregator))
+        
+        # Hidden layers
+        for _ in range(num_layers - 2):
+            self.convs.append(
+                SAGEConv(hidden_channels, hidden_channels, aggr=aggregator))
+            
+        # Output layer
+        self.convs.append(SAGEConv(hidden_channels, out_channels, aggr=aggregator))
+
+    def forward(self, x, edge_index):
+        for i in range(self.num_layers - 1):
+            x = self.convs[i](x, edge_index)
+            x = F.relu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.convs[-1](x, edge_index)
+        return F.log_softmax(x, dim=1)
+    
     
 class MinCut(torch.nn.Module):
     def __init__(self, data):
@@ -99,7 +115,6 @@ class MinCut(torch.nn.Module):
         # Cluster assignments
         s = self.pool(x)
         
-        # Obtain MinCutPool losses
         adj = to_dense_adj(edge_index)
         _, _, mc_loss, o_loss = dense_mincut_pool(x, adj, s)
         
@@ -131,10 +146,10 @@ class DiffPool(torch.nn.Module):
         x = F.relu(self.conv1(x, edge_index))
         x = F.relu(self.conv2(x, edge_index))
         
-        # Cluster assignments
+        # clsuterings
         s = self.pool(x)
         
-        # Obtain MinCutPool losses
+        # losses
         adj = to_dense_adj(edge_index)
         _, _, mc_loss, o_loss = dense_diff_pool(x, adj, s)
         
@@ -142,6 +157,30 @@ class DiffPool(torch.nn.Module):
         out = self.classifier(x)
         
         return F.log_softmax(out, dim=-1), mc_loss, o_loss
+
+
+    
+class DMoN(torch.nn.Module):
+    def __init__(self, in_channels, num_clusters, hidden_channels=16):
+        super().__init__()
+        self.conv1 = GCNConv(in_channels, hidden_channels)
+        self.pool1 = DMoNPooling([hidden_channels, hidden_channels], num_clusters)
+        self.conv2 = DenseGCNConv(hidden_channels, hidden_channels) 
+        self.pool2 = DMoNPooling([hidden_channels, hidden_channels], num_clusters)
+        
+    def forward(self, x, edge_index):
+        x = F.selu(self.conv1(x, edge_index))
+        batch = torch.zeros(x.size(0), dtype=torch.long, device=x.device)
+        x, mask = to_dense_batch(x, batch=batch)
+        adj = to_dense_adj(edge_index, batch=batch)
+        
+        ca, x, adj, sl1, ol1, cl1 = self.pool1(x, adj, mask)
+        
+        x = F.selu(self.conv2(x, adj))
+        ca, x, adj, sl2, ol2, cl2 = self.pool2(x, adj)
+        
+        # Return cluster assignments and combined losses
+        return ca.squeeze(0), sl1 + sl2 + ol1 + ol2 + cl1 + cl2
 
     
 
