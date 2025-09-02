@@ -13,8 +13,6 @@ Tests how well different Graph Neural Networks can find communities in networks 
 pip install torch torch-geometric networkx scikit-learn numpy matplotlib networkx
 ```
 
-## Quick Start
-
 
 ## Methods Tested
 
@@ -31,8 +29,8 @@ pip install torch torch-geometric networkx scikit-learn numpy matplotlib network
 ## Datasets
 
 **Synthetic:**
-- LFR benchmark graphs
-- Stochastic Block Models
+- LFR benchmark graphs With Attributes
+- Degree Corrected Stochastic Block Models with Attributes
 
 **Real:**
 - Cora (papers: 2,708 nodes)
@@ -44,8 +42,6 @@ pip install torch torch-geometric networkx scikit-learn numpy matplotlib network
 1. **Node attribute noise** - Add random noise to features
 2. **Edge removal** - Delete random or important edges  
 3. **Adversarial attacks** - Nettack and Metattack
-
-## Run Experiments
 
 
 
