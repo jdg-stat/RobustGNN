@@ -13,8 +13,8 @@ Tests how well different Graph Neural Networks can find communities in networks 
 | `torch-geometric` | 2.7.0 | Graph neural network library |
 | `numpy` | 1.26.0 | Numerical computing |
 | `pandas` | 2.1.4 | Data manipulation |
-| `networkx` | — | Graph generation and analysis |
-| `matplotlib` | — | Plotting and visualization |
+| `networkx` | 3.1 | Graph generation and analysis |
+| `matplotlib` | 3.8 | Plotting and visualization |
 | `seaborn` | 0.13.2 | Statistical visualizations |
 | `clusim` | 0.4 | Clustering similarity metrics |
 
