@@ -1,0 +1,12 @@
+numpy==1.26.0
+torch==2.2.0
+torch-geometric==2.7.0
+torch_cluster==1.6.3+pt22cu118
+torch_scatter==2.1.2+pt22cu118
+torch_sparse==0.6.18+pt22cu118
+torch_spline_conv==1.2.2+pt22cu118
+networkx==3.1 
+matplotlib==3.8  
+pandas==2.1.4
+seaborn==0.13.2
+clusim==0.4
